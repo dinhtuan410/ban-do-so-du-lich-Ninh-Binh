@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bản Đồ Số Du Lịch Ninh Bình - Dự Án STEM KHKT THCS Trường THCS Khánh Trung</title>
+    
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- 3. Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #map {
+            height: calc(100vh - 65px);
+            width: 100%;
+            z-index: 1;
+        }
+        .custom-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            border-radius: 50%;
+            border: 2.5px solid white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+            transition: transform 0.2s ease, background-color 0.2s;
+            cursor: pointer;
+        }
+        .custom-marker:hover {
+            transform: scale(1.2);
+        }
+        
+        .user-location-marker {
+            width: 18px;
+            height: 18px;
+            background-color: #2563eb;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.3);
+            animation: pulse-user 2s infinite;
+        }
+        @keyframes pulse-user {
+            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5); }
+            70% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
+
+        .custom-tooltip {
+            background-color: rgba(15, 23, 42, 0.85) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            font-size: 11px !important;
+            padding: 3px 8px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+        }
+        .custom-tooltip::before {
+            border-top-color: rgba(15, 23, 42, 0.85) !important;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0d9488;
+            border-radius: 4px;
+        }
+
+        .star-rating i {
+            cursor: pointer;
+            transition: color 0.15s ease-in-out;
+        }
+
+        @media (max-width: 640px) {
+            .mobile-bottom-panel {
+                max-height: 80vh;
+                border-bottom-left-radius: 0 !important;
+                border-bottom-right-radius: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex flex-col h-screen overflow-hidden">
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="h-[60px] md:h-[65px] bg-gradient-to-r from-teal-800 via-emerald-700 to-amber-700 text-white shadow-md flex items-center justify-between px-3 md:px-6 z-20 flex-shrink-0">
+        <div class="flex items-center space-x-2.5 md:space-x-3">
+            <div class="bg-white/20 p-1.5 md:p-2 rounded-xl backdrop-blur-md flex items-center justify-center">
+                <i class="fa-solid fa-map-location-dot text-xl md:text-2xl text-amber-300"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm md:text-lg tracking-wide uppercase leading-tight">Bản Đồ Du Lịch Ninh Bình </h1>
+                <p class="text-[10px] md:text-[11px] text-emerald-100 hidden sm:block">Sản phẩm thuộc dự án NCKH của Trường THCS Khánh Trung</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button onclick="locateUser()" title="Định vị vị trí của tôi" class="sm:hidden bg-white/20 hover:bg-white/30 text-white p-2 rounded-xl text-xs backdrop-blur-sm transition flex items-center gap-1">
+                <i class="fa-solid fa-crosshairs text-amber-300"></i>
+            </button>
+            <span class="bg-amber-400 text-slate-900 font-extrabold text-[10px] md:text-xs px-2.5 md:px-3 py-1 rounded-full shadow-sm whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap mr-0.5 md:mr-1"></i> <span class="hidden xs:inline">Ninh Bình </span>GIS STEM
+            </span>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN MAP AREA ==================== -->
+    <div class="relative flex-1 w-full h-full overflow-hidden">
+        
+        <div id="map"></div>
+
+        <!-- ================= NHÓM BỘ LỌC NHANH CUỘN NGANG (TỐI ƯU MOBILE) ================= -->
+        <div class="absolute top-3 left-12 right-3 sm:right-auto sm:max-w-md z-[1000] pointer-events-none">
+            <div class="pointer-events-auto flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar bg-slate-900/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/20 shadow-lg">
+                <button onclick="quickFilterCategory('all')" id="qfilter-all" class="qfilter-btn px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-amber-400 text-slate-900 shadow transition">
+                    Tất cả
+                </button>
+                <button onclick="quickFilterCategory('sinh-thai')" id="qfilter-sinh-thai" class="qfilter-btn px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-white/80 hover:bg-white text-slate-800 transition">
+                    🌲 Sinh thái
+                </button>
+                <button onclick="quickFilterCategory('tam-linh')" id="qfilter-tam-linh" class="qfilter-btn px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-white/80 hover:bg-white text-slate-800 transition">
+                    🕌 Tâm linh - Lịch sử
+                </button>
+                <button onclick="quickFilterCategory('lang-nghe')" id="qfilter-lang-nghe" class="qfilter-btn px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-white/80 hover:bg-white text-slate-800 transition">
+                    🔨 Làng nghề
+                </button>
+                <button onclick="quickFilterCategory('trai-nghiem')" id="qfilter-trai-nghiem" class="qfilter-btn px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-white/80 hover:bg-white text-slate-800 transition">
+                    📸 Check-in
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= BẢNG ĐIỀU KHIỂN & BỘ LỌC ================= -->
+        <div class="absolute top-16 sm:top-4 right-3 sm:right-4 z-[1000] w-auto max-w-[calc(100vw-24px)] sm:w-80">
+            <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden transition-all duration-300">
+                
+                <div class="bg-slate-800 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 flex justify-between items-center cursor-pointer select-none" onclick="toggleControlPanel()">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-sliders text-amber-400 text-xs sm:text-sm"></i>
+                        <h2 class="font-bold text-xs sm:text-sm tracking-wide">Bộ Lọc Chi Tiết</h2>
+                    </div>
+                    <button id="panel-toggle-btn" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs transition">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                </div>
+
+                <div id="panel-body" class="p-3.5 sm:p-4 space-y-3.5 max-h-[60vh] sm:max-h-[75vh] overflow-y-auto hidden">
+                    
+                    <div>
+                        <label class="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-layer-group text-teal-600 mr-1"></i> Nền Bản Đồ Google
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="btn-map-streets" onclick="setGoogleMapLayer('streets')" 
+                                class="px-2.5 py-2 text-xs font-semibold rounded-xl border border-teal-600 bg-teal-50 text-teal-700 flex items-center justify-center gap-1.5 transition">
+                                <i class="fa-solid fa-map"></i> Đường Đi
+                            </button>
+                            <button id="btn-map-satellite" onclick="setGoogleMapLayer('satellite')" 
+                                class="px-2.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center gap-1.5 transition">
+                                <i class="fa-solid fa-satellite"></i> Vệ Tinh
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-200">
+
+                    <div>
+                        <label class="block text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-eye text-teal-600 mr-1"></i> Yếu Tố Hiển Thị
+                        </label>
+                        <label class="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-slate-100/80 cursor-pointer border border-slate-200/60 transition">
+                            <span class="text-xs font-medium text-slate-700 flex items-center">
+                                <i class="fa-solid fa-tag text-amber-500 mr-2"></i> Nhãn tên địa điểm
+                            </span>
+                            <input type="checkbox" id="toggle-labels" onchange="toggleMarkerLabels()" checked class="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 cursor-pointer">
+                        </label>
+                    </div>
+
+                    <hr class="border-slate-200">
+
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                <i class="fa-solid fa-filter text-teal-600 mr-1"></i> Danh Mục Hiển Thị
+                            </label>
+                            <button onclick="selectAllCategories(true)" class="text-[10px] text-teal-600 hover:underline font-semibold">Hiện tất cả</button>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="flex items-center justify-between p-1.5 sm:p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition">
+                                <span class="text-xs font-medium text-slate-700 flex items-center truncate">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2 flex-shrink-0"></span>
+                                    Danh thắng & Sinh thái
+                                </span>
+                                <input type="checkbox" id="cat-sinh-thai" onchange="applyFilters()" checked class="cat-checkbox w-4 h-4 text-emerald-600 rounded cursor-pointer">
+                            </label>
+
+                            <label class="flex items-center justify-between p-1.5 sm:p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition">
+                                <span class="text-xs font-medium text-slate-700 flex items-center truncate">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2 flex-shrink-0"></span>
+                                    Văn hóa - Tâm linh - Lịch sử
+                                </span>
+                                <input type="checkbox" id="cat-tam-linh" onchange="applyFilters()" checked class="cat-checkbox w-4 h-4 text-amber-600 rounded cursor-pointer">
+                            </label>
+
+                            <label class="flex items-center justify-between p-1.5 sm:p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition">
+                                <span class="text-xs font-medium text-slate-700 flex items-center truncate">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2 flex-shrink-0"></span>
+                                    Làng nghề truyền thống
+                                </span>
+                                <input type="checkbox" id="cat-lang-nghe" onchange="applyFilters()" checked class="cat-checkbox w-4 h-4 text-rose-600 rounded cursor-pointer">
+                            </label>
+
+                            <label class="flex items-center justify-between p-1.5 sm:p-2 rounded-xl hover:bg-slate-50 cursor-pointer transition">
+                                <span class="text-xs font-medium text-slate-700 flex items-center truncate">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 mr-2 flex-shrink-0"></span>
+                                    Check-in & Trải nghiệm
+                                </span>
+                                <input type="checkbox" id="cat-trai-nghiem" onchange="applyFilters()" checked class="cat-checkbox w-4 h-4 text-indigo-600 rounded cursor-pointer">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-teal-50 border border-teal-100 rounded-xl p-2 text-center">
+                        <span class="text-xs text-teal-800 font-medium">
+                            Đang hiện: <strong id="visible-count" class="text-teal-900 font-bold">0</strong> địa điểm
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= BẢNG GỢI Ý ĐỊA ĐIỂM GẦN BẠN ================= -->
+        <div class="absolute bottom-3 left-3 right-3 sm:right-auto sm:left-4 z-[1000] sm:w-80">
+            <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden transition-all duration-300">
+                
+                <div class="bg-teal-800 text-white px-3.5 py-2.5 sm:px-4 flex justify-between items-center cursor-pointer select-none" onclick="toggleNearbyPanel()">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-location-crosshairs text-amber-300 text-xs sm:text-sm"></i>
+                        <h2 class="font-bold text-xs sm:text-sm tracking-wide">Địa Điểm Gần Bạn (&le; 5km)</h2>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="event.stopPropagation(); locateUser();" title="Cập nhật vị trí" class="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px] transition">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                        <button id="nearby-toggle-btn" class="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-[10px] transition">
+                            <i class="fa-solid fa-chevron-up"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="nearby-panel-body" class="p-3 max-h-44 sm:max-h-52 overflow-y-auto space-y-2 hidden">
+                    <div id="nearby-loading" class="text-center py-3 text-slate-500 text-xs flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-spinner fa-spin text-teal-600"></i>
+                        <span>Đang định vị GPS...</span>
+                    </div>
+                    <div id="nearby-list" class="space-y-1.5 hidden"></div>
+                </div>
+
+                <div class="bg-slate-50 px-3 py-1.5 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-500">
+                    <span id="user-coords-status" class="truncate max-w-[180px] sm:max-w-[200px]">Đang lấy vị trí...</span>
+                    <button onclick="useFallbackLocation()" class="text-teal-700 hover:underline font-semibold whitespace-nowrap">Mẫu Hoa Lư</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL HIỂN THỊ CHI TIẾT ================= -->
+        <div id="info-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[2000] flex justify-center items-end sm:items-center p-0 sm:p-4 md:p-6 hidden transition-opacity duration-300">
+            <div class="bg-white w-full sm:max-w-4xl max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all">
+                
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-teal-700 to-emerald-800 text-white p-3.5 sm:p-5 flex justify-between items-center flex-shrink-0">
+                    <div class="pr-2">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <span id="modal-category" class="inline-block bg-amber-400 text-slate-900 text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase">Thể loại</span>
+                            <div class="flex items-center bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold text-amber-300">
+                                <i class="fa-solid fa-star mr-1"></i>
+                                <span id="modal-avg-rating">4.8</span>/5 (<span id="modal-review-count">0</span>)
+                            </div>
+                        </div>
+                        <h2 id="modal-title" class="text-base sm:text-2xl font-bold leading-snug">Tên Địa Điểm</h2>
+                    </div>
+                    <button onclick="closeModal()" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/30 flex items-center justify-center text-white text-base sm:text-lg transition flex-shrink-0">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                    
+                    <div class="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-2xl">
+                        <p id="modal-description" class="text-slate-700 leading-relaxed text-xs sm:text-base">Mô tả thông tin địa danh...</p>
+                    </div>
+
+                    <div>
+                        <div class="flex border-b border-slate-200 mb-3 overflow-x-auto scrollbar-none">
+                            <button id="tab-btn-image" onclick="switchTab('image')" class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-teal-700 border-b-2 border-teal-700 flex items-center gap-1.5 whitespace-nowrap">
+                                <i class="fa-solid fa-images"></i> Bộ Ảnh Chi Tiết
+                            </button>
+                            <button id="tab-btn-video" onclick="switchTab('video')" class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 border-b-2 border-transparent hover:text-teal-700 flex items-center gap-1.5 whitespace-nowrap">
+                                <i class="fa-solid fa-circle-play"></i> Video Giới Thiệu
+                            </button>
+                            <button id="tab-btn-game" onclick="switchTab('game')" class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 border-b-2 border-transparent hover:text-teal-700 flex items-center gap-1.5 whitespace-nowrap relative">
+                                <i class="fa-solid fa-gift text-amber-500"></i> Quà Check-in (300m)
+                                <span class="animate-ping absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
+                            </button>
+                            <button id="tab-btn-reviews" onclick="switchTab('reviews')" class="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 border-b-2 border-transparent hover:text-teal-700 flex items-center gap-1.5 whitespace-nowrap">
+                                <i class="fa-solid fa-comments"></i> Đánh Giá
+                            </button>
+                        </div>
+
+                        <!-- Khung Bộ Ảnh Nhiều Tấm -->
+                        <div id="tab-content-image" class="space-y-3">
+                            <div class="relative bg-slate-900 rounded-2xl h-[210px] sm:h-[350px] overflow-hidden border border-slate-200 flex flex-col items-center justify-center">
+                                <img id="modal-image-preview" src="" alt="Hình ảnh địa danh" referrerpolicy="no-referrer" crossorigin="anonymous" class="w-full h-full object-cover transition-all duration-300">
+                                
+                                <button onclick="navigateImage(-1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition">
+                                    <i class="fa-solid fa-chevron-left text-xs sm:text-base"></i>
+                                </button>
+                                <button onclick="navigateImage(1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition">
+                                    <i class="fa-solid fa-chevron-right text-xs sm:text-base"></i>
+                                </button>
+
+                                <div class="absolute bottom-2 left-2 right-2 bg-gradient-to-t from-black/80 to-transparent p-2 rounded-b-xl text-white text-[11px] sm:text-xs flex justify-between items-center">
+                                    <p id="modal-image-caption" class="font-medium truncate pr-2">Hình ảnh địa danh</p>
+                                    <span id="modal-image-counter" class="bg-white/20 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap">1 / 3</span>
+                                </div>
+                            </div>
+
+                            <!-- Thư viện ảnh thu nhỏ -->
+                            <div class="flex items-center gap-2 overflow-x-auto pb-1" id="modal-thumbnails-container"></div>
+                        </div>
+
+                        <!-- Khung Video HTML5 Trực Tiếp (Phát file MP4 local mượt mà 100%) -->
+                        <div id="tab-content-video" class="hidden flex flex-col space-y-2">
+                            <div class="relative bg-black rounded-2xl h-[210px] sm:h-[330px] overflow-hidden flex items-center justify-center">
+                                <video id="modal-video-player" class="w-full h-full object-contain" controls controlsList="nodownload" preload="metadata">
+                                    <source id="modal-video-source" src="" type="video/mp4">
+                                    Trình duyệt của bạn không hỗ trợ thẻ phát video HTML5.
+                                </video>
+                            </div>
+                        </div>
+
+                        <!-- KHUNG TRÒ CHƠI CHECK-IN MỞ QUÀ MAY MẮN (GEOFENCING 300M + GIỚI HẠN IP) -->
+                        <div id="tab-content-game" class="hidden space-y-4">
+                            <div class="bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-0.5 rounded-2xl shadow-lg">
+                                <div class="bg-white rounded-[15px] p-4 sm:p-6 text-center space-y-4">
+                                    
+                                    <div class="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-100 text-amber-600 text-2xl sm:text-3xl shadow-inner">
+                                        <i class="fa-solid fa-box-open" id="game-gift-icon"></i>
+                                    </div>
+
+                                    <div>
+                                        <h3 class="font-extrabold text-base sm:text-lg text-slate-800">Mở Hộp Quà Khám Phá Ninh Bình & Vùng Phụ Cận</h3>
+                                        <p class="text-xs text-slate-500 mt-1">Check-in trong bán kính <strong class="text-amber-600">300 mét</strong> quanh địa điểm để mở phần quà ngẫu nhiên!</p>
+                                        <div class="mt-2 inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+                                            <i class="fa-solid fa-network-wired text-amber-600"></i> Giới hạn: <strong>1 phần quà / 1 IP thiết bị</strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- Thẻ hiển thị khoảng cách GPS & IP -->
+                                    <div class="bg-slate-100 p-3 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm">
+                                        <div class="flex items-center space-x-1.5 text-slate-600">
+                                            <i class="fa-solid fa-location-crosshairs text-teal-600"></i>
+                                            <span>Khoảng cách:</span>
+                                            <span id="game-current-dist-text" class="font-bold text-slate-800">Đang tính...</span>
+                                        </div>
+                                        <div class="flex items-center space-x-1.5 text-slate-500 text-[11px] bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                                            <i class="fa-solid fa-shield-halved text-indigo-500"></i>
+                                            <span>IP Máy:</span>
+                                            <strong id="user-ip-display" class="font-mono text-slate-700">Đang kiểm tra...</strong>
+                                        </div>
+                                    </div>
+
+                                    <!-- Nút hành động Mở quà / Báo khóa -->
+                                    <div id="game-action-container">
+                                        <button id="btn-open-gift" onclick="openRandomGift()" disabled class="w-full py-3 px-4 rounded-xl font-bold text-sm bg-slate-300 text-slate-500 cursor-not-allowed transition shadow-sm flex items-center justify-center gap-2">
+                                            <i class="fa-solid fa-lock"></i> Chưa đủ điều kiện (Chỉ mở trong 300m)
+                                        </button>
+                                    </div>
+
+                                    <!-- Kết quả mở quà -->
+                                    <div id="game-result-box" class="hidden bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 text-left space-y-2.5 animate-fade-in">
+                                        <div class="flex items-center justify-between text-emerald-800 font-bold text-xs sm:text-sm">
+                                            <span><i class="fa-solid fa-trophy text-amber-500 mr-1.5"></i> PHẦN QUÀ CỦA BẠN:</span>
+                                            <span class="text-[10px] bg-emerald-200 px-2 py-0.5 rounded-full text-emerald-900 font-semibold">Đã nhận</span>
+                                        </div>
+                                        <h4 id="gift-title" class="font-bold text-sm sm:text-base text-teal-900">Tên phần quà</h4>
+                                        <p id="gift-description" class="text-xs text-slate-600">Chi tiết phần quà...</p>
+                                        
+                                        <!-- Cảnh báo thời gian quy đổi quà tặng màu đỏ -->
+                                        <div class="bg-red-50 border border-red-200 p-2 rounded-xl text-center">
+                                            <p class="text-xs text-red-600 font-bold flex items-center justify-center gap-1.5">
+                                                <i class="fa-solid fa-clock-rotate-left text-red-500"></i>
+                                                Lưu ý: Thời gian quy đổi quà tặng trong vòng 48 giờ kể từ khi mở quà!
+                                            </p>
+                                        </div>
+
+                                        <!-- Bổ sung Chi tiết Ngày Giờ Mở Quà & Thời Hạn Đổi Quà -->
+                                        <div class="bg-white/80 p-2.5 rounded-xl border border-emerald-200 text-[11px] space-y-1.5 text-slate-700">
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-slate-500"><i class="fa-regular fa-calendar-check text-teal-600 mr-1"></i>Thời gian mở quà:</span>
+                                                <strong id="gift-opened-time" class="text-slate-800 font-medium">--/--/---- --:--</strong>
+                                            </div>
+                                            <div class="flex justify-between items-center text-red-700 font-medium">
+                                                <span><i class="fa-solid fa-hourglass-half text-red-500 mr-1"></i>Hạn chót đổi quà (48h):</span>
+                                                <strong id="gift-expiry-time" class="font-bold">--/--/---- --:--</strong>
+                                            </div>
+                                            <div class="flex justify-between items-center text-indigo-700">
+                                                <span class="font-medium"><i class="fa-solid fa-laptop-code text-indigo-500 mr-1"></i>Xác thực IP:</span>
+                                                <strong id="gift-registered-ip" class="font-mono">...</strong>
+                                            </div>
+                                        </div>
+
+                                        <div class="pt-2 flex justify-between items-center text-[11px] text-teal-700 border-t border-emerald-200/60">
+                                            <span>Mã may mắn: <strong id="gift-code" class="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 text-amber-700 font-bold">NB-8888</strong></span>
+                                            <span class="italic text-[10px] text-slate-400">Vui lòng lưu lại ảnh màn hình</span>
+                                        </div>
+
+                                        <!-- KHUNG QUẢNG CÁO NGẪU NHIÊN NẰM DƯỚI CÙNG THẺ QUÀ TẶNG -->
+                                        <div id="gift-ad-container" class="mt-3 pt-3 border-t border-dashed border-emerald-300">
+                                            <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1.5">
+                                                <span class="flex items-center gap-1"><i class="fa-solid fa-rectangle-ad text-amber-500"></i> Đơn vị tài trợ & Quảng cáo:</span>
+                                                <span class="bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded">Tài trợ</span>
+                                            </div>
+                                            <a id="ad-banner-link" href="#" target="_blank" class="block group relative rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition">
+                                                <img id="ad-banner-img" src="" alt="Banner Quảng Cáo" referrerpolicy="no-referrer" crossorigin="anonymous" class="w-full h-24 sm:h-28 object-cover group-hover:scale-105 transition duration-300">
+                                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-2.5 flex flex-col justify-end text-white">
+                                                    <h5 id="ad-banner-title" class="font-bold text-xs truncate">Tên đơn vị quảng cáo</h5>
+                                                    <p id="ad-banner-desc" class="text-[10px] text-slate-200 truncate">Mô tả chương trình ưu đãi...</p>
+                                                </div>
+                                            </a>
+                                        </div>
+
+                                    </div>
+
+                                    <!-- Chế độ giả lập dành cho Giáo viên / BGK Chấm thi -->
+                                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                                        <span class="flex items-center gap-1"><i class="fa-solid fa-flask text-indigo-500"></i> Chế độ Test KHKT:</span>
+                                        <button onclick="simulateNearDistance()" class="text-indigo-600 hover:text-indigo-800 font-semibold underline hover:bg-indigo-50 px-2 py-1 rounded transition">
+                                            Giả lập GPS cách 100m
+                                        </button>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Khung Đánh Giá & Nhận Xét -->
+                        <div id="tab-content-reviews" class="hidden space-y-4">
+                            <div class="bg-teal-50 border border-teal-200 p-3 sm:p-4 rounded-2xl">
+                                <h3 class="font-bold text-xs sm:text-sm text-teal-900 mb-2 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-pen-to-square"></i> Viết đánh giá trải nghiệm
+                                </h3>
+                                
+                                <div class="space-y-2.5">
+                                    <div>
+                                        <div class="star-rating flex items-center space-x-1 text-lg sm:text-xl text-amber-400" id="user-star-input">
+                                            <i class="fa-solid fa-star" onclick="setRatingScore(1)"></i>
+                                            <i class="fa-solid fa-star" onclick="setRatingScore(2)"></i>
+                                            <i class="fa-solid fa-star" onclick="setRatingScore(3)"></i>
+                                            <i class="fa-solid fa-star" onclick="setRatingScore(4)"></i>
+                                            <i class="fa-solid fa-star" onclick="setRatingScore(5)"></i>
+                                            <span id="selected-star-text" class="text-[11px] text-slate-500 font-normal ml-2">(5 sao)</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <input type="text" id="reviewer-name" placeholder="Tên bạn (VD: Nguyễn Văn A)" class="px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:border-teal-600">
+                                        <input type="text" id="reviewer-role" placeholder="Vai trò (VD: Học sinh / Du khách)" class="px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:border-teal-600">
+                                    </div>
+
+                                    <textarea id="reviewer-comment" rows="2" placeholder="Nhập cảm nhận của bạn..." class="w-full p-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:border-teal-600 resize-none"></textarea>
+
+                                    <div class="flex justify-end">
+                                        <button onclick="submitReview()" class="bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+                                            <i class="fa-solid fa-paper-plane"></i> Gửi Đánh Giá
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="font-bold text-[11px] sm:text-xs text-slate-500 uppercase tracking-wider mb-2">
+                                    Cộng đồng nhận xét (<span id="reviews-list-count">0</span>)
+                                </h3>
+                                <div id="reviews-container" class="space-y-2 max-h-[180px] sm:max-h-[220px] overflow-y-auto pr-1"></div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="bg-slate-50 px-4 py-2.5 sm:px-6 sm:py-3 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-xs text-slate-500 flex-shrink-0">
+                    <span>Sản phẩm thuộc dự án NCKH của Trường THCS Khánh Trung</span>
+                    <button onclick="closeModal()" class="px-3 py-1 sm:px-4 sm:py-1.5 bg-slate-200 hover:bg-slate-300 font-semibold rounded-xl text-slate-700 transition">Đóng</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        /* DANH SÁCH BANNER QUẢNG CÁO NGẪU NHIÊN DƯỚI THẺ QUÀ TẶNG */
+        const randomAdsList = [
+            {
+                title: "Đặc Sản Cơm Cháy Dê Núi Ninh Bình",
+                desc: "Giảm 15% cho du khách check-in qua Bản đồ Số STEM THCS Khánh Trung",
+                image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+                link: "https://ninhbinh.gov.vn"
+            },
+            {
+                title: "Trà Thảo Dược Thiên Nhiên Sinh Dược",
+                desc: "Sản phẩm OCOP 5 sao Làng nghề truyền thống Gia Viễn",
+                image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80",
+                link: "https://ninhbinh.gov.vn"
+            },
+            {
+                title: "Cổ Phục Hoa Lư - Cho Thuê Trang Phục",
+                desc: "Chụp ảnh lưu niệm không gian cố đô rực rỡ sắc màu",
+                image: "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80",
+                link: "https://ninhbinh.gov.vn"
+            },
+            {
+                title: "Khu Dã Ngoại Đồi Thông Camping",
+                desc: "Trải nghiệm cắm trại và tiệc nướng sinh thái bên bờ sông",
+                image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+                link: "https://ninhbinh.gov.vn"
+            }
+        ];
+
+        /* DANH SÁCH PHẦN QUÀ TẶNG / ƯU ĐÃI KHI MỞ HỘP QUÀ */
+        const randomGiftsList = [
+            { 
+                title: "Voucher 20% Cơm Cháy Ninh Bình", 
+                desc: "Giảm 20% khi mua đặc sản Cơm Cháy Dê Núi tại các cơ sở liên kết du lịch STEM Ninh Bình.", 
+                icon: "fa-utensils", 
+                color: "text-amber-500" 
+            },
+            { 
+                title: "Vé Thuyền Ưu Tiên Tràng An", 
+                desc: "Thẻ ưu tiên trải nghiệm tuyến chèo thuyền ngắm cảnh di sản Tràng An không phải xếp hàng chờ đợi lâu.", 
+                icon: "fa-ship", 
+                color: "text-teal-500" 
+            },
+            { 
+                title: "Huy Hiệu Nhà Khám Phá Ninh Bình 3D", 
+                desc: "Huy hiệu số chứng nhận bạn đã hoàn thành check-in điểm đến trên Bản đồ KHKT STEM.", 
+                icon: "fa-award", 
+                color: "text-indigo-500" 
+            },
+            { 
+                title: "Voucher 15% Thuê Áo Cổ Phục Hoa Lư", 
+                desc: "Giảm ngay 15% khi thuê trang phục cổ phong chụp ảnh check-in tại Cố Đô Hoa Lư & Phố Cổ.", 
+                icon: "fa-shirt", 
+                color: "text-rose-500" 
+            },
+            { 
+                title: "Thẻ Quà Tặng Trà Dược Liệu Sinh Dược", 
+                desc: "Tặng 01 hộp trà thảo dược thiên nhiên sản xuất tại Làng nghề Sinh Dược Ninh Bình.", 
+                icon: "fa-leaf", 
+                color: "text-emerald-500" 
+            },
+            { 
+                title: "Lời Chúc May Mắn & Bình An", 
+                desc: "Chúc bạn có một chuyến du ngoạn Ninh Bình tràn ngập niềm vui, sức khỏe và nhiều kỉ niệm đẹp!", 
+                icon: "fa-clover", 
+                color: "text-green-500" 
+            },
+            { 
+                title: "Lời Chúc cho Fan cứng Ninh Bình", 
+                desc: "Chúc bạn đã đạt danh hiệu Fan cứng của du lịch Ninh Bình!", 
+                icon: "fa-clover", 
+                color: "text-green-500" 
+            }
+        ];
+
+        /* DỮ LIỆU CÁC ĐỊA ĐIỂM DU LỊCH NINH BÌNH VÀ VÙNG PHỤ CẬN */
+        const tourismSpots = [
+            {
+                id: 'chua-tam-chuc',
+                name: 'Khu Du Lịch Tâm Linh Chùa Tam Chúc',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.5583, 
+                lng: 105.8111,
+                description: 'Ngôi chùa lớn nhất thế giới nằm tại Kim Bảng (Hà Nam), tựa lưng vào núi Thất X星, mặt hướng ra hồ Tam Chúc thơ mộng với kiến trúc Phật giáo đồ sộ và những bức phù điêu tạc bằng đá núi lửa.',
+                images: [
+                    'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/chua-tam-chuc.mp4'
+            },
+            {
+                id: 'chua-dia-tang-phi-lai',
+                name: 'Chùa Địa Tạng Phi Lai (Chùa Đùng)',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.4789,
+                lng: 105.9758,
+                description: 'Tọa lạc tại Thanh Liêm (Hà Nam), ẩn mình giữa rừng tùng bách xanh mát. Ngôi chùa nổi tiếng với khuôn viên rải sỏi trắng tĩnh mịch, thanh tịnh mang nét văn hóa Thiền định độc đáo.',
+                images: [
+                    'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/chua-dia-tang.mp4'
+            },
+            {
+                id: 'chua-cay-thi',
+                name: 'Chùa Cây Thị (Chùa Tản Viên)',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.4852,
+                lng: 105.9621,
+                description: 'Ngôi chùa cổ thuộc Thanh Liêm (Hà Nam) nổi tiếng với không gian thơ mộng, đồi mây uốn lượn, kiến trúc kết hợp hài hòa giữa nét truyền thống Việt Nam và phong cách Á Đông thanh thoát.',
+                images: [
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/chua-cay-thi.mp4'
+            },
+            {
+                id: 'den-tran-nam-dinh',
+                name: 'Khu Di Tích Đền Trần Nam Định',
+                category: 'tam-linh',
+                categoryName: 'Lịch sử - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.4475,
+                lng: 106.1708,
+                description: 'Nơi thờ tự các vị vua nhà Trần cùng các quan lại có công thần giúp nước. Nổi tiếng với Lễ khai ấn Đền Trần đêm 14 tháng Giêng âm lịch hằng năm thu hút đông đảo du khách.',
+                images: [
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/den-tran.mp4'
+            },
+            {
+                id: 'trang-an',
+                name: 'Quần Thể Danh Thắng Tràng An',
+                category: 'sinh-thai',
+                categoryName: 'Sinh thái & Di sản',
+                color: '#10b981',
+                lat: 20.2536, 
+                lng: 105.9080,
+                description: 'Di sản Văn hóa và Thiên nhiên Thế giới kép độc nhất tại Đông Nam Á. Tràng An nổi tiếng với hệ thống hang động xuyên thủy uốn lượn qua các dãy núi đá vôi triệu năm tuổi.',
+                images: [
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl:'videos/Trang An.mp4.mp4'
+             },
+            {
+                id: 'dong-van-trinh',
+                name: 'Động Vân Trình',
+                category: 'sinh-thai',
+                categoryName: 'Danh thắng & Sinh thái',
+                color: '#10b981',
+                lat: 20.2281,
+                lng: 105.8075,
+                description: 'Nằm trong lòng núi Mõ thuộc huyện Nho Quan, Động Vân Trình là một trong những hang động lớn và đẹp nhất Ninh Bình với diện tích khoảng 4.000m², vô vàn nhũ đá lấp lánh kỳ ảo dạng rèm rủ, cột đá trần hang độc đáo.',
+                images: [
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/dong-van-trinh.mp4'
+            },
+            {
+                id: 'dong-thien-ha',
+                name: 'Động Thiên Hà',
+                category: 'sinh-thai',
+                categoryName: 'Danh thắng & Sinh thái',
+                color: '#10b981',
+                lat: 20.2078,
+                lng: 105.8925,
+                description: 'Được mệnh danh là "Dải Ngân Hà trong lòng núi", Động Thiên Hà nằm trong dải núi Tướng thuộc huyện Nho Quan. Động gồm hai phần: động khô và động nước xuyên thủy thơ mộng với vách đá rủ vô số nhũ đá muôn hình muôn vẻ.',
+                images: [
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/dong-thien-ha.mp4'
+            },
+            {
+                id: 'tuyet-tinh-coc',
+                name: 'Tuyệt Tịnh Cốc (Động Am Tiên)',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Lịch sử - Danh thắng',
+                color: '#f59e0b',
+                lat: 20.281089,
+                lng: 105.911741,
+                description: 'Nằm ẩn mình trong thung lũng khép kín bao quanh bởi vách đá dựng đứng và hồ nước xanh ngọc bích. Đây là nơi Thái hậu Dương Vân Nga tu hành những năm tháng cuối đời.',
+                images: [
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/tuyet-tinh-coc.mp4'
+            },
+            {
+                id: 'dam-van-long',
+                name: 'Khu Bảo Tồn Thiên Nhiên Đầm Vân Long',
+                category: 'sinh-thai',
+                categoryName: 'Sinh thái & Bảo tồn',
+                color: '#10b981',
+                lat: 20.3703,
+                lng: 105.8824,
+                description: 'Khu bảo tồn thiên nhiên ngập nước lớn nhất vùng đồng bằng Bắc Bộ. Nơi đây sở hữu bức tranh thủy mặc hữu tình và là nơi sinh sống của đàn Voọc mông trắng quý hiếm.',
+                images: [
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/van-long.mp4'
+            },
+            {
+                id: 'doi-thong',
+                name: 'Đồi Thông Camping',
+                category: 'trai-nghiem',
+                categoryName: 'Check-in & Trải nghiệm',
+                color: '#6366f1',
+                lat: 20.225439,
+                lng: 105.791466,
+                description: 'Điểm dã ngoại, cắm trại và check-in trải nghiệm hấp dẫn bên dòng sông mát lành tại Ninh Bình, thu hút đông đảo du khách trẻ trải nghiệm không gian hòa mình cùng thiên nhiên.',
+                images: [
+                    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/doi-thong.mp4'
+            },
+            {
+                id: 'pho-co-hoa-lu',
+                name: 'Phố Cổ Hoa Lư',
+                category: 'trai-nghiem',
+                categoryName: 'Check-in & Trải nghiệm',
+                color: '#6366f1',
+                lat: 20.263666,
+                lng: 105.966649,
+                description: 'Không gian văn hóa tái hiện nét đẹp truyền thống của Đại Việt xưa, tọa lạc ngay cạnh hồ Kỳ Lân với kiến trúc cổ kính lung linh về đêm.',
+                images: [
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/pho-co-hoa-lu.mp4'
+            },
+            {
+                id: 'bai-dinh',
+                name: 'Chùa Bái Đính',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.2747, 
+                lng: 105.8524,
+                description: 'Khu chùa quy mô lớn nhất Việt Nam với nhiều kỷ lục châu Á như hành lang 500 vị La Hán bằng đá xanh, đại hồng chung lớn nhất và tượng Phật bằng đồng dát vàng.',
+                images: [
+                    'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/bai-dinh.mp4'
+            },
+            {
+                id: 'hoa-lu',
+                name: 'Cố Đô Hoa Lư',
+                category: 'tam-linh',
+                categoryName: 'Lịch sử - Văn hóa',
+                color: '#f59e0b',
+                lat: 20.2839, 
+                lng: 105.9038,
+                description: 'Kinh đô đầu tiên của nhà nước phong kiến tập quyền Việt Nam dưới triều Đinh, Tiền Lê. Nơi lưu giữ nhiều cổ vật giá trị và đền thờ các vị vua anh hùng.',
+                images: [
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/hoa-lu.mp4'
+            },
+            {
+                id: 'phat-diem',
+                name: 'Nhà Thờ Đá Phát Diệm',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Kiến trúc',
+                color: '#f59e0b',
+                lat: 20.0928, 
+                lng: 106.0792,
+                description: 'Kiệt tác kiến trúc Công giáo kết hợp độc đáo với đường nét đình chùa truyền thống Á Đông, được xây dựng hoàn toàn bằng đá và gỗ lim quý.',
+                images: [
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/phat-diem.mp4'
+            },
+            {
+                id: 'lang-da-ninh-van',
+                name: 'Làng Nghề Đá Mỹ Nghệ Ninh Vân',
+                category: 'lang-nghe',
+                categoryName: 'Làng nghề truyền thống',
+                color: '#f43f5e',
+                lat: 20.2036, 
+                lng: 105.9181,
+                description: 'Làng nghề chế tác đá mỹ nghệ nổi tiếng hàng trăm năm tuổi tại Hoa Lư. Nơi đây quy tụ các nghệ nhân bàn tay vàng tạo ra những tác phẩm điêu khắc đá hoa văn tinh xảo.',
+                images: [
+                    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/lang-da-ninh-van.mp4'
+            },
+            {
+                id: 'lang-theu-van-lam',
+                name: 'Làng Nghề Thêu Ren Văn Lâm',
+                category: 'lang-nghe',
+                categoryName: 'Làng nghề truyền thống',
+                color: '#f43f5e',
+                lat: 20.2185,
+                lng: 105.9328,
+                description: 'Tọa lạc ngay cửa ngõ khu du lịch Tam Cốc - Bích Động, làng nghề thêu ren Văn Lâm có lịch sử hơn 700 năm. Các sản phẩm thêu tay tinh xảo từ tranh thêu, khăn, áo đến ga gối luôn thu hút du khách trong và ngoài nước.',
+                images: [
+                    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/van-lam.mp4'
+            },
+            {
+                id: 'lang-chieu-coi-kim-son',
+                name: 'Làng Nghề Chiếu Cói Kim Sơn',
+                category: 'lang-nghe',
+                categoryName: 'Làng nghề truyền thống',
+                color: '#f43f5e',
+                lat: 20.0952,
+                lng: 106.0825,
+                description: 'Nằm ở vùng ven biển Kim Sơn, làng nghề trồng cói và dệt chiếu cói truyền thống đã tồn tại hơn trăm năm. Bằng đôi tay khéo léo, các nghệ nhân tạo nên những chiếc chiếu cói bền đẹp cùng nhiều sản phẩm thủ công mỹ nghệ đa dạng.',
+                images: [
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/kim-son.mp4'
+            },
+            {
+                id: 'lang-sinh-duoc',
+                name: 'Làng Nghề Sinh Dược (Thảo Dược Thiên Nhiên)',
+                category: 'lang-nghe',
+                categoryName: 'Làng nghề truyền thống',
+                color: '#f43f5e',
+                lat: 20.2655,
+                lng: 105.8621,
+                description: 'Tọa lạc tại xã Gia Sinh (Gia Viễn), làng Sinh Dược nổi tiếng với nghề trồng và chế biến thảo dược thiên nhiên có từ thời Thiền sư Nguyễn Minh Không. Nổi tiếng với các sản phẩm xà bông thảo dược, muối ngâm chân và trà thảo mộc độc đáo.',
+                images: [
+                    'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/sinh-duoc.mp4'
+            },
+            {
+                id: 'lang-gom-bo-bat',
+                name: 'Làng Nghề Gốm Bồ Bát',
+                category: 'lang-nghe',
+                categoryName: 'Làng nghề truyền thống',
+                color: '#f43f5e',
+                lat: 20.1802,
+                lng: 105.9868,
+                description: 'Làng gốm cổ Bồ Bát (Yên Mô) có lịch sử hàng nghìn năm, chính là cội nguồn của làng gốm Bát Tràng ngày nay. Sản phẩm gốm Bồ Bát nổi tiếng với nước men gốm trắng gốm đắp nổi, hoa văn tinh xảo và độ bền cao.',
+                images: [
+                    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/bo-bat.mp4'
+            },
+            {
+                id: 'lang-moc-phuc-loc',
+                name: 'Làng Nghề Mộc Phúc Lộc',
+                category: 'lang-nghe',
+                categoryName: 'Làng nghề truyền thống',
+                color: '#f43f5e',
+                lat: 20.2486,
+                lng: 105.9815,
+                description: 'Làng nghề mộc truyền thống Phúc Lộc thuộc phường Nam Thành, TP. Ninh Bình. Nơi đây nổi tiếng từ hàng trăm năm qua với kỹ thuật chạm khắc gỗ thủ công tinh xảo, chuyên chế tác các công trình nhà gỗ cổ, đền chùa và đồ gỗ mỹ nghệ cao cấp.',
+                images: [
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/phuc-loc.mp4'
+            },
+            {
+                id: 'nui-non-nuoc',
+                name: 'Núi Non Nước (Dục Thúy Sơn)',
+                category: 'tam-linh',
+                categoryName: 'Lịch sử - Danh thắng',
+                color: '#f59e0b',
+                lat: 20.2542,
+                lng: 105.9825,
+                description: 'Tọa lạc ngay ngã ba sông Vân và sông Đáy tại trung tâm TP. Ninh Bình. Núi Non Nước được mệnh danh là "Thi sơn" với hơn 40 bài thơ vách đá của các danh nhân lịch sử như Trương Hán Siêu, Lê Thánh Tông, Nguyễn Trãi...',
+                images: [
+                    'https://vhtt.ninhbinh.gov.vn/public/userfiles/image/16-1-2020-2.jpg',
+                    'https://premedia.vneconomy.vn/files/uploads/2025/10/20/1f0595970d594bfc8ac357db7fbff5f1-22686.jpg'
+                ],
+                videoUrl: 'videos/nui-non-nuoc.mp4'
+            },
+            {
+                id: 'chua-vang',
+                name: 'Chùa Vàng Ninh Bình',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.260739,
+                lng: 105.948654,
+                description: 'Tọa lạc trên đảo giữa hồ Cá Voi, nổi bật với cảnh sắc thơ mộng, không gian yên bình và kiến trúc độc đáo. Chùa được tái tạo từ chùa Bát Long xưa, vừa giữ nét cổ kính vừa hòa hợp với thiên nhiên, hứa hẹn sẽ được dát vàng toàn bộ trong tương lai.',
+                images: [
+                    'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/chua-vang.mp4'
+            },
+            {
+                id: 'chua-bich-dong',
+                name: 'Chùa Bích Động',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.217646,
+                lng: 105.915869,
+                description: 'Chùa Bích Động là ngôi chùa cổ nổi tiếng ở Ninh Bình, tọa lạc trên núi đá vôi Trường Yên, gồm ba tầng: Hạ, Trung và Thượng, kết hợp hài hòa giữa kiến trúc Phật giáo và cảnh quan thiên nhiên hữu tình.',
+                images: [
+                    'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/bich-dong.mp4'
+            },
+            {
+                id: 'ho-nui-lo',
+                name: 'Hồ Núi Lớ',
+                category: 'trai-nghiem',
+                categoryName: 'Check-in & Trải nghiệm',
+                color: '#10b981',
+                lat: 20.2015,
+                lng: 105.7820,
+                description: 'Hồ nước ngọt tự nhiên nằm ẩn mình giữa lòng đồi thông và vách núi đá vôi tại huyện Nho Quan. Nơi đây sở hữu khung cảnh hoang sơ, không khí trong lành, rất thích hợp cho du lịch sinh thái và cắm trại ngoài trời.',
+                images: [
+                    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/ho-nui-lo.mp4'
+            },
+            {
+                id: 'bai-soi-khe-coc',
+                name: 'Bãi Sỏi Khê Cốc',
+                category: 'trai-nghiem',
+                categoryName: 'Check-in & Trải nghiệm',
+                color: '#6366f1',
+                lat: 20.2210,
+                lng: 105.9285,
+                description: 'Điểm trải nghiệm văn hóa du lịch độc đáo thuộc vùng di sản Tràng An - Tam Cốc. Tái hiện không gian sống văn hóa lúa nước truyền thống, bãi sỏi tự nhiên ven dòng sông uốn lượn thu hút du khách chụp ảnh check-in.',
+                images: [
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/khe-coc.mp4'
+            },
+            {
+                id: 'ben-thanh',
+                name: 'Bến Thánh',
+                category: 'tam-linh',
+                categoryName: 'Lịch sử - Tâm linh',
+                color: '#f59e0b',
+                lat: 20.224915,
+                lng: 105.932307,
+                description: 'Khu di tích bến sông cổ gắn liền với Đền thờ Quốc sư Nguyễn Minh Không (Thánh Nguyễn) tại Gia Viễn. Nơi đây mang giá trị tâm linh - lịch sử sâu sắc cùng phong cảnh sông nước cổ kính tĩnh mịch.',
+                images: [
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/ben-thanh.mp4'
+            },
+            {
+                id: 'hang-mua',
+                name: 'Khu Du Lịch Hang Múa',
+                category: 'trai-nghiem',
+                categoryName: 'Check-in & Trải nghiệm',
+                color: '#6366f1',
+                lat: 20.230285,
+                lng: 105.936015,
+                description: 'Điểm ngắm toàn cảnh Tam Cốc tuyệt đẹp từ trên đỉnh núi Ngoạ Long với gần 500 bậc đá được chạm khắc hoa văn tinh xảo.',
+                images: [
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/hang-mua.mp4'
+            },
+            {
+                id: 'tam-coc',
+                name: 'Tam Cốc - Bích Động',
+                category: 'sinh-thai',
+                categoryName: 'Danh thắng Sinh thái',
+                color: '#10b981',
+                lat: 20.216800, 
+                lng: 105.936697,
+                description: 'Trải nghiệm chèo thuyền trên dòng sông Ngô Đồng uốn lượn qua các vách núi đá vôi hùng vĩ và cánh đồng lúa chín vàng óng tuyệt đẹp.',
+                images: [
+                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/tam-coc.mp4'
+            },
+            {
+                id: 'co-vien-lau',
+                name: 'Khu Du Lịch Cố Viên Lầu (Làng Cổ Tam Cốc)',
+                category: 'tam-linh',
+                categoryName: 'Văn hóa - Lịch sử',
+                color: '#f59e0b',
+                lat: 20.2188,
+                lng: 105.9312,
+                description: 'Nằm ngay sát bến thuyền Tam Cốc, Cố Viên Lầu là khu làng cổ phục dựng quần thể nhà cổ truyền thống tinh xảo đặc trưng của vùng đồng bằng Bắc Bộ thế kỷ 18–20, lưu giữ vô số cổ vật gia dụng quý giá.',
+                images: [
+                    'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/co-vien-lau.mp4'
+            },
+            {
+                id: 'cuc-phuong',
+                name: 'Vườn Quốc Gia Cúc Phương',
+                category: 'sinh-thai',
+                categoryName: 'Sinh thái Bảo tồn',
+                color: '#10b981',
+                lat: 20.3167, 
+                lng: 105.6083,
+                description: 'Vườn quốc gia đầu tiên của Việt Nam. Bảo tàng thiên nhiên sống động lưu giữ cây Chò ngàn năm tuổi và Trung tâm cứu hộ động vật hoang dã quý hiếm.',
+                images: [
+                    'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=80',
+                    'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1000&q=80'
+                ],
+                videoUrl: 'videos/cuc-phuong.mp4'
+            }
+        ];
+
+        /* DỮ LIỆU ĐÁNH GIÁ MẶC ĐỊNH LƯU TRONG LOCALSTORAGE */
+        const defaultReviewsData = {
+            'chua-tam-chuc': [
+                { name: 'Trần Văn Mạnh', role: 'Du khách Hà Nội', rating: 5, comment: 'Chùa rất rộng lớn và nguy nga, cảnh sắc hồ Tam Chúc vô cùng thơ mộng!', date: '20/10/2026' }
+            ],
+            'chua-dia-tang-phi-lai': [
+                { name: 'Nguyễn Thị Hương', role: 'Phật tử', rating: 5, comment: 'Không gian thanh tịnh, tiếng chuông chùa thanh bình giúp tâm hồn tĩnh lặng.', date: '15/10/2026' }
+            ],
+            'den-tran-nam-dinh': [
+                { name: 'Lê Hoàng Nam', role: 'Khách du lịch', rating: 5, comment: 'Nơi lưu giữ nét đẹp lịch sử hào hùng triều Trần, khuôn viên Đền rất cổ kính.', date: '10/10/2026' }
+            ]
+        };
+
+        /* KHỞI TẠO BẢN ĐỒ */
+        const map = L.map('map', { zoomControl: false }).setView([20.32, 105.92], 10);
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+
+        const googleStreetsLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps | Đề tài KHKT STEM Ninh Bình'
+        });
+
+        const googleSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps Satellite | Đề tài KHKT STEM'
+        });
+
+        googleStreetsLayer.addTo(map);
+        let currentMapLayer = 'streets';
+        let loadedMarkers = [];
+        let userLocationMarker = null;
+        let currentUserPos = null;
+        let activeSpot = null;
+        let currentSelectedRating = 5;
+        let currentImageIndex = 0;
+        let currentSpotDistanceMeters = Infinity;
+        let userPublicIP = "Checking...";
+
+        /* HÀM LẤY ĐỊA CHỈ IP MÁY */
+        async function fetchUserIP() {
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const data = await res.json();
+                userPublicIP = data.ip || "127.0.0.1";
+            } catch (e) {
+                userPublicIP = "IP-" + Math.floor(100000 + Math.random() * 900000);
+            }
+            const ipEl = document.getElementById('user-ip-display');
+            if (ipEl) ipEl.innerText = userPublicIP;
+        }
+
+        /* XỬ LÝ LƯU TRỮ VÀ QUẢN LÝ ĐÁNH GIÁ (LOCALSTORAGE) */
+        function getSpotReviews(spotId) {
+            const savedData = localStorage.getItem('ninhbinh_reviews_db');
+            let db = savedData ? JSON.parse(savedData) : defaultReviewsData;
+            return db[spotId] || [];
+        }
+
+        function saveSpotReview(spotId, newReview) {
+            const savedData = localStorage.getItem('ninhbinh_reviews_db');
+            let db = savedData ? JSON.parse(savedData) : defaultReviewsData;
+            
+            if (!db[spotId]) db[spotId] = [];
+            db[spotId].unshift(newReview);
+            
+            localStorage.setItem('ninhbinh_reviews_db', JSON.stringify(db));
+        }
+
+        function calculateAverageRating(reviews) {
+            if (!reviews || reviews.length === 0) return { avg: "5.0", count: 0 };
+            const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+            return {
+                avg: (sum / reviews.length).toFixed(1),
+                count: reviews.length
+            };
+        }
+
+        /* HÀM ĐỊNH VỊ GPS VÀ TÍNH KHOẢNG CÁCH */
+        function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function locateUser() {
+            const statusEl = document.getElementById('user-coords-status');
+            const loadingEl = document.getElementById('nearby-loading');
+            const listEl = document.getElementById('nearby-list');
+
+            statusEl.innerText = "Đang tìm tín hiệu GPS...";
+            loadingEl.classList.remove('hidden');
+            listEl.classList.add('hidden');
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentUserPos = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        updateUserPositionOnMap(currentUserPos.lat, currentUserPos.lng, "Vị trí của bạn");
+                    },
+                    (error) => {
+                        console.warn("Dùng vị trí mẫu:", error.message);
+                        useFallbackLocation();
+                    },
+                    { enableHighAccuracy: true, timeout: 7000 }
+                );
+            } else {
+                useFallbackLocation();
+            }
+        }
+
+        function useFallbackLocation() {
+            currentUserPos = { lat: 20.2700, lng: 105.9100 };
+            updateUserPositionOnMap(currentUserPos.lat, currentUserPos.lng, "Vị trí mẫu (Trung tâm Hoa Lư)");
+        }
+
+        function updateUserPositionOnMap(lat, lng, label) {
+            if (userLocationMarker) {
+                map.removeLayer(userLocationMarker);
+            }
+
+            const userIcon = L.divIcon({
+                className: 'custom-user-icon',
+                html: `<div class="user-location-marker" title="${label}"></div>`,
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+
+            userLocationMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
+            userLocationMarker.bindTooltip(label, { permanent: false, direction: 'top' });
+
+            document.getElementById('user-coords-status').innerText = `GPS: ${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+            updateNearbySpotsList(lat, lng);
+        }
+
+        function updateNearbySpotsList(userLat, userLng) {
+            const loadingEl = document.getElementById('nearby-loading');
+            const listEl = document.getElementById('nearby-list');
+            const nearbySpots = [];
+
+            tourismSpots.forEach(spot => {
+                const dist = calculateDistanceKm(userLat, userLng, spot.lat, spot.lng);
+                if (dist <= 15.0) {
+                    nearbySpots.push({ ...spot, distanceKm: dist });
+                }
+            });
+
+            nearbySpots.sort((a, b) => a.distanceKm - b.distanceKm);
+
+            loadingEl.classList.add('hidden');
+            listEl.classList.remove('hidden');
+
+            if (nearbySpots.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-3 text-slate-500 text-xs">
+                        <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i>
+                        Không có địa điểm nào trong bán kính gần.
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = nearbySpots.map(spot => {
+                const distFormatted = spot.distanceKm < 1 
+                    ? `${Math.round(spot.distanceKm * 1000)} m` 
+                    : `${spot.distanceKm.toFixed(1)} km`;
+
+                return `
+                    <div onclick="focusAndOpenSpot('${spot.id}')" 
+                         class="p-2 bg-slate-50 hover:bg-teal-50 border border-slate-200/80 hover:border-teal-300 rounded-xl cursor-pointer transition flex items-center justify-between group">
+                        <div class="flex items-center space-x-2.5 overflow-hidden">
+                            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${spot.color}"></span>
+                            <div class="truncate">
+                                <h4 class="font-bold text-xs text-slate-800 group-hover:text-teal-800 truncate">${spot.name}</h4>
+                                <p class="text-[10px] text-slate-500 truncate">${spot.categoryName}</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-extrabold bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full whitespace-nowrap ml-2">
+                            <i class="fa-solid fa-person-walking mr-0.5"></i>${distFormatted}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function focusAndOpenSpot(spotId) {
+            const target = tourismSpots.find(s => s.id === spotId);
+            if (target) {
+                map.flyTo([target.lat, target.lng], 15, { duration: 1.2 });
+                openModal(target);
+            }
+        }
+
+        function toggleNearbyPanel() {
+            const body = document.getElementById('nearby-panel-body');
+            const icon = document.querySelector('#nearby-toggle-btn i');
+            if (body.classList.contains('hidden')) {
+                body.classList.remove('hidden');
+                icon.className = 'fa-solid fa-chevron-down';
+            } else {
+                body.classList.add('hidden');
+                icon.className = 'fa-solid fa-chevron-up';
+            }
+        }
+
+        /* ĐIỀU KHIỂN NỀN VÀ BỘ LỌC BẢN ĐỒ */
+        function quickFilterCategory(cat) {
+            document.querySelectorAll('.qfilter-btn').forEach(btn => {
+                btn.className = "qfilter-btn px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-white/80 hover:bg-white text-slate-800 transition";
+            });
+
+            const activeBtn = document.getElementById(`qfilter-${cat}`);
+            if (activeBtn) {
+                activeBtn.className = "qfilter-btn px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-amber-400 text-slate-900 shadow transition";
+            }
+
+            if (cat === 'all') {
+                selectAllCategories(true);
+            } else {
+                document.getElementById('cat-sinh-thai').checked = (cat === 'sinh-thai');
+                document.getElementById('cat-tam-linh').checked = (cat === 'tam-linh');
+                document.getElementById('cat-lang-nghe').checked = (cat === 'lang-nghe');
+                document.getElementById('cat-trai-nghiem').checked = (cat === 'trai-nghiem');
+                applyFilters();
+            }
+        }
+
+        function setGoogleMapLayer(type) {
+            const btnStreets = document.getElementById('btn-map-streets');
+            const btnSat = document.getElementById('btn-map-satellite');
+
+            if (type === 'streets' && currentMapLayer !== 'streets') {
+                map.removeLayer(googleSatelliteLayer);
+                map.addLayer(googleStreetsLayer);
+                currentMapLayer = 'streets';
+
+                btnStreets.className = "px-3 py-2 text-xs font-semibold rounded-xl border border-teal-600 bg-teal-50 text-teal-700 flex items-center justify-center gap-1.5 transition";
+                btnSat.className = "px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center gap-1.5 transition";
+            } else if (type === 'satellite' && currentMapLayer !== 'satellite') {
+                map.removeLayer(googleStreetsLayer);
+                map.addLayer(googleSatelliteLayer);
+                currentMapLayer = 'satellite';
+
+                btnSat.className = "px-3 py-2 text-xs font-semibold rounded-xl border border-teal-600 bg-teal-50 text-teal-700 flex items-center justify-center gap-1.5 transition";
+                btnStreets.className = "px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center gap-1.5 transition";
+            }
+        }
+
+        function renderMarkersOnMap() {
+            loadedMarkers.forEach(item => map.removeLayer(item.markerObj));
+            loadedMarkers = [];
+
+            const showLabels = document.getElementById('toggle-labels').checked;
+
+            tourismSpots.forEach(spot => {
+                let iconClass = 'fa-mountain-sun';
+                if (spot.category === 'tam-linh') iconClass = 'fa-gopuram';
+                if (spot.category === 'lang-nghe') iconClass = 'fa-hammer';
+                if (spot.category === 'trai-nghiem') iconClass = 'fa-camera';
+
+                const customIcon = L.divIcon({
+                    className: 'custom-leaflet-marker',
+                    html: `<div class="custom-marker w-9 h-9 text-sm" style="background-color: ${spot.color}">
+                             <i class="fa-solid ${iconClass}"></i>
+                           </div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+
+                const marker = L.marker([spot.lat, spot.lng], { icon: customIcon });
+
+                if (showLabels) {
+                    marker.bindTooltip(spot.name, {
+                        permanent: true,
+                        direction: 'bottom',
+                        className: 'custom-tooltip',
+                        offset: [0, 10]
+                    });
+                }
+
+                marker.on('click', () => openModal(spot));
+
+                loadedMarkers.push({
+                    data: spot,
+                    markerObj: marker,
+                    isDisplayed: false
+                });
+            });
+
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const showSinhThai = document.getElementById('cat-sinh-thai').checked;
+            const showTamLinh = document.getElementById('cat-tam-linh').checked;
+            const showLangNghe = document.getElementById('cat-lang-nghe').checked;
+            const showTraiNghiem = document.getElementById('cat-trai-nghiem').checked;
+
+            let count = 0;
+
+            loadedMarkers.forEach(item => {
+                const cat = item.data.category;
+                let shouldShow = false;
+
+                if (cat === 'sinh-thai' && showSinhThai) shouldShow = true;
+                if (cat === 'tam-linh' && showTamLinh) shouldShow = true;
+                if (cat === 'lang-nghe' && showLangNghe) shouldShow = true;
+                if (cat === 'trai-nghiem' && showTraiNghiem) shouldShow = true;
+
+                if (shouldShow) {
+                    if (!item.isDisplayed) {
+                        item.markerObj.addTo(map);
+                        item.isDisplayed = true;
+                    }
+                    count++;
+                } else {
+                    if (item.isDisplayed) {
+                        map.removeLayer(item.markerObj);
+                        item.isDisplayed = false;
+                    }
+                }
+            });
+
+            document.getElementById('visible-count').innerText = count;
+        }
+
+        function toggleMarkerLabels() {
+            renderMarkersOnMap();
+        }
+
+        function selectAllCategories(status) {
+            document.getElementById('cat-sinh-thai').checked = status;
+            document.getElementById('cat-tam-linh').checked = status;
+            document.getElementById('cat-lang-nghe').checked = status;
+            document.getElementById('cat-trai-nghiem').checked = status;
+            applyFilters();
+        }
+
+        function toggleControlPanel() {
+            const body = document.getElementById('panel-body');
+            const icon = document.querySelector('#panel-toggle-btn i');
+            
+            if (body.classList.contains('hidden')) {
+                body.classList.remove('hidden');
+                icon.className = 'fa-solid fa-chevron-up';
+            } else {
+                body.classList.add('hidden');
+                icon.className = 'fa-solid fa-chevron-down';
+            }
+        }
+
+        /* QUẢN LÝ THƯ VIỆN HÌNH ẢNH NHIỀU TẤM */
+        function loadGalleryImages(spot) {
+            currentImageIndex = 0;
+            const imgList = spot.images || [spot.imageUrl || 'https://placehold.co/800x500/0d9488/ffffff?text=Anh+Minh+Hoa'];
+            
+            updateImagePreview(spot, 0);
+
+            const thumbContainer = document.getElementById('modal-thumbnails-container');
+            thumbContainer.innerHTML = imgList.map((imgUrl, index) => `
+                <button onclick="selectGalleryImage(${index})" 
+                        id="thumb-btn-${index}" 
+                        class="relative w-16 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${index === 0 ? 'border-teal-600 scale-105 shadow-md' : 'border-slate-200 opacity-60 hover:opacity-100'}">
+                    <img src="${imgUrl}" referrerpolicy="no-referrer" crossorigin="anonymous" class="w-full h-full object-cover" alt="Thumbnail ${index + 1}">
+                </button>
+            `).join('');
+        }
+
+        function selectGalleryImage(index) {
+            if (!activeSpot) return;
+            const imgList = activeSpot.images || [activeSpot.imageUrl];
+            if (index < 0 || index >= imgList.length) return;
+
+            const prevThumb = document.getElementById(`thumb-btn-${currentImageIndex}`);
+            if (prevThumb) prevThumb.className = "relative w-16 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 border-slate-200 opacity-60 hover:opacity-100 transition-all";
+
+            currentImageIndex = index;
+
+            const newThumb = document.getElementById(`thumb-btn-${currentImageIndex}`);
+            if (newThumb) newThumb.className = "relative w-16 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 border-teal-600 scale-105 shadow-md transition-all";
+
+            updateImagePreview(activeSpot, currentImageIndex);
+        }
+
+        function navigateImage(direction) {
+            if (!activeSpot) return;
+            const imgList = activeSpot.images || [activeSpot.imageUrl];
+            let newIndex = currentImageIndex + direction;
+
+            if (newIndex < 0) newIndex = imgList.length - 1;
+            if (newIndex >= imgList.length) newIndex = 0;
+
+            selectGalleryImage(newIndex);
+        }
+
+        function updateImagePreview(spot, index) {
+            const imgList = spot.images || [spot.imageUrl || 'https://placehold.co/800x500/0d9488/ffffff?text=Anh+Minh+Hoa'];
+            const imgPreview = document.getElementById('modal-image-preview');
+            const imgCaption = document.getElementById('modal-image-caption');
+            const imgCounter = document.getElementById('modal-image-counter');
+
+            imgPreview.src = imgList[index];
+            imgCaption.innerText = `Hình ảnh ${index + 1}: ${spot.name}`;
+            imgCounter.innerText = `${index + 1} / ${imgList.length}`;
+        }
+
+        /* MODAL POPUP VÀ TẢI ĐÁNH GIÁ */
+        function openModal(spot) {
+            activeSpot = spot;
+            document.getElementById('modal-title').innerText = spot.name;
+            document.getElementById('modal-category').innerText = spot.categoryName;
+            document.getElementById('modal-description').innerText = spot.description;
+
+            loadGalleryImages(spot);
+
+            // Nạp nguồn video HTML5 trực tiếp
+            const videoPlayer = document.getElementById('modal-video-player');
+            const videoSource = document.getElementById('modal-video-source');
+            if (videoPlayer && videoSource && spot.videoUrl) {
+                videoSource.src = spot.videoUrl;
+                videoPlayer.load();
+            }
+
+            checkGameEligibility(spot);
+            setRatingScore(5);
+            document.getElementById('reviewer-name').value = '';
+            document.getElementById('reviewer-role').value = '';
+            document.getElementById('reviewer-comment').value = '';
+
+            renderSpotReviews(spot.id);
+
+            switchTab('image');
+            document.getElementById('info-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('info-modal').classList.add('hidden');
+            const videoPlayer = document.getElementById('modal-video-player');
+            if (videoPlayer) {
+                videoPlayer.pause();
+            }
+        }
+
+        /* XỬ LÝ ĐÁNH GIÁ SAO VÀ ĐỂ LẠI BÌNH LUẬN */
+        function setRatingScore(score) {
+            currentSelectedRating = score;
+            const stars = document.querySelectorAll('#user-star-input i');
+            stars.forEach((star, index) => {
+                if (index < score) {
+                    star.className = 'fa-solid fa-star text-amber-400';
+                } else {
+                    star.className = 'fa-regular fa-star text-slate-300';
+                }
+            });
+            const textEl = document.getElementById('selected-star-text');
+            if (textEl) textEl.innerText = `(${score} sao)`;
+        }
+
+        function submitReview() {
+            if (!activeSpot) return;
+
+            const nameInput = document.getElementById('reviewer-name').value.trim();
+            const roleInput = document.getElementById('reviewer-role').value.trim();
+            const commentInput = document.getElementById('reviewer-comment').value.trim();
+
+            if (!nameInput || !commentInput) {
+                alert('Vui lòng nhập tên và nội dung đánh giá của bạn!');
+                return;
+            }
+
+            const newReview = {
+                name: nameInput,
+                role: roleInput || 'Du khách',
+                rating: currentSelectedRating,
+                comment: commentInput,
+                date: new Date().toLocaleDateString('vi-VN')
+            };
+
+            saveSpotReview(activeSpot.id, newReview);
+            renderSpotReviews(activeSpot.id);
+
+            document.getElementById('reviewer-comment').value = '';
+            alert('Cảm ơn bạn đã gửi đánh giá trải nghiệm!');
+        }
+
+        function renderSpotReviews(spotId) {
+            const reviews = getSpotReviews(spotId);
+            const ratingInfo = calculateAverageRating(reviews);
+
+            document.getElementById('modal-avg-rating').innerText = ratingInfo.avg;
+            document.getElementById('modal-review-count').innerText = ratingInfo.count;
+            document.getElementById('reviews-list-count').innerText = reviews.length;
+
+            const container = document.getElementById('reviews-container');
+            if (!reviews || reviews.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-slate-400 text-xs italic">
+                        Chưa có đánh giá nào cho địa điểm này. Hãy là người đầu tiên để lại cảm nhận!
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = reviews.map(r => {
+                let starsHtml = '';
+                for (let i = 1; i <= 5; i++) {
+                    starsHtml += `<i class="fa-solid fa-star ${i <= r.rating ? 'text-amber-400' : 'text-slate-200'} text-[10px]"></i>`;
+                }
+
+                return `
+                    <div class="bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl space-y-1">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-xs text-slate-800">${r.name}</span>
+                                <span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-full">${r.role}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400">${r.date}</span>
+                        </div>
+                        <div class="flex items-center space-x-1">${starsHtml}</div>
+                        <p class="text-xs text-slate-600 leading-snug">${r.comment}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function formatDateTimeVi(dateObj) {
+            const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return `${timeStr} - ${dateStr}`;
+        }
+
+        /* XỬ LÝ TRÒ CHƠI MỞ QUÀ CHECK-IN 300M VÀ GIỚI HẠN IP MÁY */
+        function checkGameEligibility(spot) {
+            const distStatusText = document.getElementById('game-current-dist-text');
+            const actionContainer = document.getElementById('game-action-container');
+            const resultBox = document.getElementById('game-result-box');
+            const ipEl = document.getElementById('user-ip-display');
+            
+            if (ipEl) ipEl.innerText = userPublicIP;
+            resultBox.classList.add('hidden');
+
+            if (!currentUserPos) {
+                distStatusText.innerText = "Chưa có tín hiệu GPS";
+                actionContainer.innerHTML = `
+                    <button onclick="locateUser()" class="w-full py-3 px-4 rounded-xl font-bold text-xs bg-teal-600 text-white hover:bg-teal-700 transition shadow-md flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-location-crosshairs"></i> Bật GPS Định Vị Để Kiểm Tra
+                    </button>`;
+                return;
+            }
+
+            const distKm = calculateDistanceKm(currentUserPos.lat, currentUserPos.lng, spot.lat, spot.lng);
+            currentSpotDistanceMeters = Math.round(distKm * 1000);
+
+            if (currentSpotDistanceMeters < 1000) {
+                distStatusText.innerHTML = `<span class="text-teal-700">${currentSpotDistanceMeters} mét</span>`;
+            } else {
+                distStatusText.innerHTML = `<span class="text-slate-700">${distKm.toFixed(2)} km</span>`;
+            }
+
+            const claimedGifts = JSON.parse(localStorage.getItem('ninhbinh_claimed_gifts') || '{}');
+            const claimedIPs = JSON.parse(localStorage.getItem('ninhbinh_claimed_ips') || '{}');
+
+            if (claimedGifts[spot.id] || (userPublicIP !== "Checking..." && claimedIPs[`${userPublicIP}_${spot.id}`])) {
+                const gift = claimedGifts[spot.id] || claimedIPs[`${userPublicIP}_${spot.id}`];
+                showGiftResult(gift);
+                actionContainer.innerHTML = `
+                    <button disabled class="w-full py-3 px-4 rounded-xl font-bold text-xs bg-slate-200 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-lock text-rose-500"></i> IP (${userPublicIP}) đã mở quà tại địa điểm này!
+                    </button>`;
+                return;
+            }
+
+            if (currentSpotDistanceMeters <= 300) {
+                actionContainer.innerHTML = `
+                    <button id="btn-open-gift" onclick="openRandomGift()" class="w-full py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white transition shadow-lg animate-bounce flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-gift"></i> MỞ PHẦN QUÀ MAY MẮN NGAY!
+                    </button>`;
+            } else {
+                const needMore = currentSpotDistanceMeters - 300;
+                const needMoreText = needMore >= 1000 ? `${(needMore/1000).toFixed(1)} km` : `${needMore}m`;
+                actionContainer.innerHTML = `
+                    <button disabled class="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-lock text-slate-400"></i> Hãy tiến lại gần thêm <strong class="text-rose-600 font-bold">${needMoreText}</strong> để mở khóa quà!
+                    </button>`;
+            }
+        }
+
+        function openRandomGift() {
+            if (!activeSpot) return;
+
+            const claimedIPs = JSON.parse(localStorage.getItem('ninhbinh_claimed_ips') || '{}');
+            if (claimedIPs[`${userPublicIP}_${activeSpot.id}`]) {
+                alert(`Địa chỉ IP (${userPublicIP}) của bạn đã từng nhận quà ở địa điểm này! Mỗi máy/IP chỉ được mở quà 1 lần.`);
+                checkGameEligibility(activeSpot);
+                return;
+            }
+
+            const randomIndex = Math.floor(Math.random() * randomGiftsList.length);
+            const gift = { ...randomGiftsList[randomIndex] };
+            
+            const now = new Date();
+            gift.code = 'NB-' + Math.floor(1000 + Math.random() * 9000);
+            gift.openedAt = now.toISOString();
+            gift.userIP = userPublicIP;
+
+            const expiryDate = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+            gift.expiresAt = expiryDate.toISOString();
+
+            const claimedGifts = JSON.parse(localStorage.getItem('ninhbinh_claimed_gifts') || '{}');
+            claimedGifts[activeSpot.id] = gift;
+            localStorage.setItem('ninhbinh_claimed_gifts', JSON.stringify(claimedGifts));
+
+            claimedIPs[`${userPublicIP}_${activeSpot.id}`] = gift;
+            localStorage.setItem('ninhbinh_claimed_ips', JSON.stringify(claimedIPs));
+
+            showGiftResult(gift);
+
+            document.getElementById('game-action-container').innerHTML = `
+                <button disabled class="w-full py-3 px-4 rounded-xl font-bold text-xs bg-slate-200 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Chúc mừng! Đã ghi nhận phần quà cho IP: ${userPublicIP}
+                </button>`;
+        }
+
+        function showGiftResult(gift) {
+            const resultBox = document.getElementById('game-result-box');
+            document.getElementById('gift-title').innerText = gift.title;
+            document.getElementById('gift-description').innerText = gift.desc;
+            document.getElementById('gift-code').innerText = gift.code || 'NB-8888';
+
+            const openedDate = gift.openedAt ? new Date(gift.openedAt) : new Date();
+            const expiryDate = gift.expiresAt ? new Date(gift.expiresAt) : new Date(openedDate.getTime() + 48 * 60 * 60 * 1000);
+
+            document.getElementById('gift-opened-time').innerText = formatDateTimeVi(openedDate);
+            document.getElementById('gift-expiry-time').innerText = formatDateTimeVi(expiryDate);
+            document.getElementById('gift-registered-ip').innerText = gift.userIP || userPublicIP;
+
+            if (randomAdsList && randomAdsList.length > 0) {
+                const randomAdIndex = Math.floor(Math.random() * randomAdsList.length);
+                const ad = randomAdsList[randomAdIndex];
+
+                document.getElementById('ad-banner-img').src = ad.image;
+                document.getElementById('ad-banner-title').innerText = ad.title;
+                document.getElementById('ad-banner-desc').innerText = ad.desc;
+                document.getElementById('ad-banner-link').href = ad.link || '#';
+            }
+
+            resultBox.classList.remove('hidden');
+        }
+
+        function simulateNearDistance() {
+            if (!activeSpot) return;
+            currentUserPos = { lat: activeSpot.lat - 0.0008, lng: activeSpot.lng - 0.0008 };
+            checkGameEligibility(activeSpot);
+        }
+
+        function switchTab(tabType) {
+            const tabImage = document.getElementById('tab-content-image');
+            const tabVideo = document.getElementById('tab-content-video');
+            const tabGame = document.getElementById('tab-content-game');
+            const tabReviews = document.getElementById('tab-content-reviews');
+            
+            const btnImage = document.getElementById('tab-btn-image');
+            const btnVideo = document.getElementById('tab-btn-video');
+            const btnGame = document.getElementById('tab-btn-game');
+            const btnReviews = document.getElementById('tab-btn-reviews');
+
+            tabImage.classList.add('hidden');
+            tabVideo.classList.add('hidden');
+            tabGame.classList.add('hidden');
+            tabReviews.classList.add('hidden');
+
+            const activeBtnClass = "px-4 py-2 text-sm font-semibold text-teal-700 border-b-2 border-teal-700 flex items-center gap-2 whitespace-nowrap";
+            const inactiveBtnClass = "px-4 py-2 text-sm font-semibold text-slate-500 border-b-2 border-transparent hover:text-teal-700 flex items-center gap-2 whitespace-nowrap";
+
+            btnImage.className = inactiveBtnClass;
+            btnVideo.className = inactiveBtnClass;
+            btnGame.className = inactiveBtnClass;
+            btnReviews.className = inactiveBtnClass;
+
+            if (tabType === 'image') {
+                tabImage.classList.remove('hidden');
+                btnImage.className = activeBtnClass;
+            } else if (tabType === 'video') {
+                tabVideo.classList.remove('hidden');
+                btnVideo.className = activeBtnClass;
+                
+                const videoPlayer = document.getElementById('modal-video-player');
+                if (videoPlayer && videoPlayer.paused) {
+                    videoPlayer.play().catch(e => console.log("Chờ người dùng phát video"));
+                }
+            } else if (tabType === 'game') {
+                tabGame.classList.remove('hidden');
+                btnGame.className = activeBtnClass;
+            } else if (tabType === 'reviews') {
+                tabReviews.classList.remove('hidden');
+                btnReviews.className = activeBtnClass;
+            }
+        }
+
+        window.onload = function () {
+            fetchUserIP();
+            renderMarkersOnMap();
+            locateUser();
+        };
+    </script>
+</body>
+</html>

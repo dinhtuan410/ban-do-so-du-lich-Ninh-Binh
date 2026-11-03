@@ -1,0 +1,23 @@
+{
+  "name": "Bản Đồ Số Du Lịch Ninh Bình",
+  "short_name": "NinhBình GIS",
+  "description": "Ứng dụng bản đồ số du lịch Ninh Bình tích hợp check-in GPS và video trực quan phục vụ dự án STEM KHKT.",
+  "start_url": "./ban do so du lich.html",
+  "display": "standalone",
+  "background_color": "#0f766e",
+  "theme_color": "#0f766e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
